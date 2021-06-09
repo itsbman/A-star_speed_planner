@@ -8,15 +8,6 @@ import pickle
 show_animation = True
 sa_count = 1
 
-plist = []
-with open('pred_list2.txt') as file:
-    data = json.load(file)
-    for p in data['fut']:
-        if len(p) != 0:
-            for post in p:
-                for pos in post[0]:
-                    plist.append([pos, post[1]])
-
 
 def grid_id(n):
     # return round(10 * n.s) * grid_x + 10 * n.t * n.v
@@ -37,13 +28,13 @@ time_step = 0.1
 dg_X = dT
 dg_Y = 1
 Y_max = 40
-# safety = 3 #3.9686932853499925 # 3.5
-safety = np.array([3.6, 3.6077, 3.6168, 3.6273, 3.6392, 3.6525, 3.6672, 3.6833,
-                        3.7008, 3.7197, 3.74, 3.7617, 3.7848, 3.8093, 3.8352, 3.8625,
-                        3.8912, 3.9213, 3.9528, 3.9857, 4.02, 4.0557, 4.0928, 4.1313,
-                        4.1712, 4.2125, 4.2552, 4.2993, 4.3448, 4.3917, 4.44, 4.4897,
-                        4.5408, 4.5933, 4.6472, 4.7025, 4.7592, 4.8173, 4.8768, 4.9377,
-                        5.])
+safety = 3.5 #3.9686932853499925 # 3.5
+# safety = np.array([3.6, 3.6077, 3.6168, 3.6273, 3.6392, 3.6525, 3.6672, 3.6833,
+#                         3.7008, 3.7197, 3.74, 3.7617, 3.7848, 3.8093, 3.8352, 3.8625,
+#                         3.8912, 3.9213, 3.9528, 3.9857, 4.02, 4.0557, 4.0928, 4.1313,
+#                         4.1712, 4.2125, 4.2552, 4.2993, 4.3448, 4.3917, 4.44, 4.4897,
+#                         4.5408, 4.5933, 4.6472, 4.7025, 4.7592, 4.8173, 4.8768, 4.9377,
+#                         5.])
 
 motions = [
     # discrete accelerations in m/s^2
@@ -91,37 +82,8 @@ def convert_obs2(obs_i):
     obs_new = [to*time_step, obs_temp]
     return obs_new
 
-
-# obs_list = [[20, 2], [20, 2.5], [20, 3]]
-obs1 = np.array(plist)[3:]
-obs2 = copy.deepcopy(obs1)
-# problematic
-obs1[:, 0] += 1
-obs1[:, 1] += 10
-obs2[:, 0] += 15
-obs2[:, 1] += 5
-# obs1[:, 0] += 10
-# obs1[:, 1] += 10
-# obs2[:, 0] += 20
-# obs2[:, 1] += 10
-obs111 = np.concatenate((obs1, obs2))
-obs11 = convert_obs2(obs111)
-
-obs21 = convert_obs2(obs2)
-obs_list = obs11
-
-obstacle_map = np.zeros((grid_x, grid_y, 2), dtype=bool)
-
-file = open('run_debug_198.pckl', 'rb')
-done_state = pickle.load(file)
-es_list = pickle.load(file)
-efs_list = pickle.load(file)
-obs_list = pickle.load(file)
-observationp = pickle.load(file)
-
-init_state = [0.0, es_list[-1][2]]
-s0 = init_state[0]
-v0 = init_state[1]
+s0 = 0.0 # init_state[0]
+v0 = 8 # init_state[1]
 
 v_u, v_l = v0 + a_max * t,  v0 + a_min * t
 s_min = np.zeros(t.size)
@@ -132,20 +94,20 @@ v_l1 = np.clip(v_l, 0, None)
 s_min1[1:] = np.cumsum(np.clip(v_l1 + 0.5 * a_min * time_step, 0, None))[:-1]*time_step
 s_max[1:] = np.cumsum(v_u + 0.5 * a_max * time_step)[:-1]*time_step
 
-obs_list = obs_list[-1]
-# version 1
-for ix in x:
-    xx = ix * dg_X
-    for iy in y:
-        yy = iy * dg_Y
-        if not (s_min[ix*int(dg_X/0.1)] <= yy):  # <= s_max[ix*int(dg_X/0.1)]):
-            obstacle_map[ix, iy, 0] = True
-            # obstacle_map[ix, iy, 1] = True
-            continue
 
-# version 3
-# safe_index = round(safety / dg_Y)
-
+obs_list = [np.array([2. , 2.1, 2.2, 2.3, 2.4, 2.5, 3., 3.1, 3.2, 3.3, 3.4, 3.5 ]),
+             [np.array([11.7]),
+              np.array([11.1, 12.]),
+              np.array([10.4, 11.3, 12.2 ]),
+              np.array([10.7, 11.5]),
+              np.array([10.1, 10.9]),
+              np.array([10.3]),
+              np.array([25.7]),
+              np.array([25.1, 26.]),
+              np.array([24.5, 25.3, 26.2]),
+              np.array([24.7, 25.5]),
+              np.array([24.1, 24.9]),
+              np.array([24.3])]]
 # plt.figure(2)
 # plt.imshow(obstacle_map[:, :, 0].transpose(), origin='lower')
 if show_animation:
@@ -160,8 +122,13 @@ if show_animation:
     # plt.plot(obs_list[0], obs_list_t, 'ok', label='obstacle')
     # plt.plot(obs2[:, 1]*0.1, obs2[:, 0], 'ok')
     plt.plot(t, s_min, 'g', label='acc. limit')
-    plt.plot(t, s_min1, 'r--', label='acc. limit')
+    # plt.plot(t, s_min1, 'r--', label='acc. limit')
     plt.plot(t, s_max, 'g')
+    # plt.legend()
+    plt.xlabel('time')
+    plt.ylabel('distance')
+    plt.pause(0.001)
+    # plt.show()
     # plt.show()
 
 
@@ -178,82 +145,6 @@ def cost_fun2(s_n, v_n, a_n):
     # cost_v = np.sum(cost_v)
     cost_a = np.sum(a_n**2)
     return Kv * cost_v + Ka * cost_a
-
-
-def valid(xid, yid):
-    if yid >= grid_y:
-        return False, False
-
-    om = obstacle_map[xid, yid, :]
-    if om[0]:
-        return om[0], om[1]
-
-    return True, False
-
-
-# def ccw(x1, y1, x2, y2, x3, y3):
-#     # https://stackoverflow.com/questions/3838329/how-can-i-check-if-two-segments-intersect
-#     return (y3-y1)*(x2-x1) > (y2-y1)*(x3-x1)
-
-
-def calc_heuristic(nnode):
-    v = nnode.v
-    t0 = nnode.t
-    tg = np.arange(0, T-t0+dT, dT)
-    coll_checks = 0
-
-    for _motion in motions:
-        s = np.zeros(tg.size)
-        acc = _motion[1]
-        # delta_s = np.clip(v + acc * tg, 0, None)[1:] * dT
-        ###
-        v1 = v + a.reshape(-1, 1)*tg
-        delta_s = np.clip(v1 + 0.5 * acc * dT)*dT
-        np.cumsum(delta_s, axis=1)[:, :-1]
-        ###
-        vt = v + acc * tg
-        delta_s = np.clip(vt + 0.5 * acc * dT, 0, None)[:-1] * dT
-        s[1:] = np.cumsum(delta_s)
-        s += nnode.s
-        if show_animation:
-            # print(tg+t0, s)
-            l1 = plt.plot(tg+t0, s, 'y--')
-            plt.pause(0.01)
-        if check_collision2(tg+t0, s, obs_list):
-            coll_checks += 1
-            l3 = l1.pop(0)
-            l3.remove()
-        else:
-            # print(_motion)
-            return False
-
-    if coll_checks >= len(motions):
-        for _b_motion in backup_motions:
-            s = np.zeros(tg.size)
-            acc = _b_motion[1]
-
-            # delta_s = np.clip(v + acc * tg, 0, None)[:-1] * dT
-            # delta_s = np.clip(v + 0.5 * acc * tg, 0, None)[1:] * dT
-
-            vt = v + acc * tg
-            delta_s = np.clip(vt + 0.5 * acc * dT, 0, None)[:-1] * dT
-            s[1:] = np.cumsum(delta_s)
-            s += nnode.s
-            if show_animation:
-                # print(tg + t0, s)
-                l1 = plt.plot(tg+t0, s, 'y--')
-                plt.pause(0.01)
-            if check_collision2(tg+t0, s, obs_list):
-                coll_checks += 1
-                l2 = l1.pop(0)
-                l2.remove()
-            else:
-                # print(_b_motion)
-                return False
-
-        return True
-    else:
-        return False
 
 
 def calc_heuristic3(nnode):
@@ -295,7 +186,7 @@ def calc_heuristic22(nnode):
     t0 = nnode.t
     tt = min(T-t0, 2)
     # tg = np.arange(0, T-t0+dT, dT)
-    
+
     tg = np.arange(0, tt+dT, dT)
 
     # for _motion in motions:
@@ -385,8 +276,8 @@ def check_collision2(x1, x2, obstacle):
     safe_id = np.arange(0, x2.shape[0], 1)
 
     t_id = (to / time_step).astype(int)
-    safety1 = safety[t_id]
-    safety1 = safety1[tid]
+    # safety1 = safety[t_id]
+    # safety1 = safety1[tid]
 
     for i, oid in enumerate(oids):
         # ssst = time.time()
@@ -405,7 +296,8 @@ def check_collision2(x1, x2, obstacle):
         o_dl[~(o_dl < 0)] = -99999
         min_d_l = o_dl[o_dl.argmax(axis=0), np.arange(o_dl.shape[1])]
 
-        safe_i = (min_d_u >= safety1[i]) & (min_d_l <= -(safety1[i] + 5))
+        # safe_i = (min_d_u >= safety1[i]) & (min_d_l <= -(safety1[i] + 5))
+        safe_i = (min_d_u >= safety) & (min_d_l <= -(safety))
 
         safe_id = safe_id[safe_i]
         
@@ -600,14 +492,14 @@ uu, ll = get_constraints(ry[::-1], rx[::-1])
 
 if show_animation:
     plt.plot(rx, ry, 'b', label='solution')
-    for u in uu:
-        plt.plot(u[1], u[0], 'y*')
-    for l in ll:
-        plt.plot(l[1], l[0], 'y*')
-
-    plt.legend()
-    plt.xlabel('time [s]')
-    plt.ylabel('distance travelled [m]')
+    # for u in uu:
+    #     plt.plot(u[1], u[0], 'y*')
+    # for l in ll:
+    #     plt.plot(l[1], l[0], 'y*')
+    #
+    # plt.legend()
+    # plt.xlabel('time [s]')
+    # plt.ylabel('distance travelled [m]')
     plt.pause(0.001)
     plt.show()
 
