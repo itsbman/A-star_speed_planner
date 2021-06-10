@@ -8,33 +8,21 @@ import pickle
 show_animation = True
 sa_count = 1
 
-
-def grid_id(n):
-    # return round(10 * n.s) * grid_x + 10 * n.t * n.v
-    return str(round(100 * n.s)) + str(round(10 * n.t)) + str(round(1000 * n.v))
-
-
 # initial conditions
-v0 = 9
 a0 = 0
-s0 = 0
+s0 = 0.0
+v0 = 8 
 v_ref = 9
 a_max, a_min = 5, -5
 
-T = 4
-dT = 0.5
-time_step = 0.1
+T = 4  # planning horizon
+dT = 0.5  # a star time step
+time_step = 0.1  
 
 dg_X = dT
 dg_Y = 1
 Y_max = 40
-safety = 3.5 #3.9686932853499925 # 3.5
-# safety = np.array([3.6, 3.6077, 3.6168, 3.6273, 3.6392, 3.6525, 3.6672, 3.6833,
-#                         3.7008, 3.7197, 3.74, 3.7617, 3.7848, 3.8093, 3.8352, 3.8625,
-#                         3.8912, 3.9213, 3.9528, 3.9857, 4.02, 4.0557, 4.0928, 4.1313,
-#                         4.1712, 4.2125, 4.2552, 4.2993, 4.3448, 4.3917, 4.44, 4.4897,
-#                         4.5408, 4.5933, 4.6472, 4.7025, 4.7592, 4.8173, 4.8768, 4.9377,
-#                         5.])
+safety = 3.5 
 
 motions = [
     # discrete accelerations in m/s^2
@@ -52,111 +40,79 @@ backup_motions = [
     [1, 3]
 ]
 
-t_motions = [
-    [1, -2],
-    [1, -1],
-    [1, 0],
-    [1, 1],
-    [1, -3],
-    [1, -4],
-    [1, -5],
-    [1, 2]
-]
 grid_x = int(T/dT + 1)
 grid_y = int(Y_max / dg_Y + 1)
-
 
 x = np.arange(0, grid_x, 1)  # grid index
 y = np.arange(0, grid_y, 1)
 t = np.arange(0, T+time_step, time_step)
 
-
-def convert_obs2(obs_i):
-    # return: [[time], [obs(time)]]
-    if obs_i.size == 0:
-        return []
-    obs_i = obs_i.transpose()
-    to = np.unique(obs_i[1])
-    obs_temp = [obs_i[0, np.where(np.isclose(tt, obs_i[1, :]))].reshape(-1, ) for tt in to]
-    # print(obs_temp)
-    obs_new = [to*time_step, obs_temp]
-    return obs_new
-
-s0 = 0.0 # init_state[0]
-v0 = 8 # init_state[1]
-
 v_u, v_l = v0 + a_max * t,  v0 + a_min * t
 s_min = np.zeros(t.size)
-s_min1 = np.zeros(t.size)
 s_max = np.zeros(t.size)
 s_min[1:] = np.cumsum(np.clip(v_l + 0.5 * a_min * time_step, 0, None))[:-1]*time_step
-v_l1 = np.clip(v_l, 0, None)
-s_min1[1:] = np.cumsum(np.clip(v_l1 + 0.5 * a_min * time_step, 0, None))[:-1]*time_step
 s_max[1:] = np.cumsum(v_u + 0.5 * a_max * time_step)[:-1]*time_step
 
+# obstacle info is sobstacle_tred as a list of numpy arrays: 
+# list[np.array(timestamp), list[np.array(obstacle pos.)]] 
+obstacle_info = [np.array([2. , 2.1, 2.2, 2.3, 2.4, 2.5, 3., 3.1, 3.2, 3.3, 3.4, 3.5 ]),
+                [np.array([11.7]),
+                np.array([11.1, 12.]),
+                np.array([10.4, 11.3, 12.2 ]),
+                np.array([10.7, 11.5]),
+                np.array([10.1, 10.9]),
+                np.array([10.3]),
+                np.array([25.7]),
+                np.array([25.1, 26.]),
+                np.array([24.5, 25.3, 26.2]),
+                np.array([24.7, 25.5]),
+                np.array([24.1, 24.9]),
+                np.array([24.3])]]
 
-obs_list = [np.array([2. , 2.1, 2.2, 2.3, 2.4, 2.5, 3., 3.1, 3.2, 3.3, 3.4, 3.5 ]),
-             [np.array([11.7]),
-              np.array([11.1, 12.]),
-              np.array([10.4, 11.3, 12.2 ]),
-              np.array([10.7, 11.5]),
-              np.array([10.1, 10.9]),
-              np.array([10.3]),
-              np.array([25.7]),
-              np.array([25.1, 26.]),
-              np.array([24.5, 25.3, 26.2]),
-              np.array([24.7, 25.5]),
-              np.array([24.1, 24.9]),
-              np.array([24.3])]]
-# plt.figure(2)
-# plt.imshow(obstacle_map[:, :, 0].transpose(), origin='lower')
 if show_animation:
     plt.figure(1)
-    # for obs_id in obs_list:
-    #     obs_1 = obs_id.transpose()
+
     plt.grid(True)
-    # plt.plot(obs1[:, 1]*0.1, obs1[:, 0], 'ok', label='obstacle')
-    for i in range(obs_list[0].shape[0]):
-        for j in range(obs_list[1][i].shape[0]):
-            plt.plot(obs_list[0][i], obs_list[1][i][j], 'ok')
-    # plt.plot(obs_list[0], obs_list_t, 'ok', label='obstacle')
-    # plt.plot(obs2[:, 1]*0.1, obs2[:, 0], 'ok')
+    for i in range(obstacle_info[0].shape[0]):
+        for j in range(obstacle_info[1][i].shape[0]):
+            plt.plot(obstacle_info[0][i], obstacle_info[1][i][j], 'ok')
     plt.plot(t, s_min, 'g', label='acc. limit')
-    # plt.plot(t, s_min1, 'r--', label='acc. limit')
     plt.plot(t, s_max, 'g')
-    # plt.legend()
     plt.xlabel('time')
     plt.ylabel('distance')
     plt.pause(0.001)
-    # plt.show()
-    # plt.show()
 
+class Node:
+    def __init__(self, xid, yid, v, cost, parent_id):
+        self.t = xid  
+        self.s = yid
+        self.v = v
+        self.cost = cost
+        self.parent_id = parent_id
 
-def cost_fun(s_n, v_n, a_n):
+    def __state__(self):
+        return self.s, self.v, self.t, self.cost, self.parent_id
+        
+def grid_id(n: Node):
+    return str(round(100 * n.s)) + str(round(10 * n.t)) + str(round(1000 * n.v))
+
+     
+def cost_fun(s_n: float, v_n: float, a_n: float):
+    """
+    Calculate the cost for node expansion
+    """
     Kv, Ka = 1, 1
     cost_v = (v_n - v_ref)**2
     cost_a = a_n**2
     return Kv * cost_v + Ka * cost_a
 
 
-def cost_fun2(s_n, v_n, a_n):
-    Kv, Ka = 1, 1
-    cost_v = np.sum((v_n - v_ref)**2)
-    # cost_v = np.sum(cost_v)
-    cost_a = np.sum(a_n**2)
-    return Kv * cost_v + Ka * cost_a
-
-
-def calc_heuristic3(nnode):
-    '''
-    :param nnode: node type
-    :return: True if there is no possible heuristic path
-    '''
-    v = nnode.v
-    t0 = nnode.t
-    # tt = min(T - t0, 2)
-    # tg = np.arange(0, T-t0+dT, dT)
-    # tg = np.arange(0, tt + dT, dT)
+def calc_heuristic(n: Node):
+    """
+    Calculate the heuristic cost
+    """
+    v = n.v
+    t0 = n.t
     tg = np.linspace(0, T-t0, int((T-t0)/0.5)+1)
 
     t_m = motions + backup_motions
@@ -166,125 +122,44 @@ def calc_heuristic3(nnode):
     v11 = np.clip(v1, 0, None)
     delta_s = np.clip(v1 + 0.5 * acc * dT, 0, None)[:, :-1] * dT
     s[:, 1:] = np.cumsum(delta_s, axis=1)
-    s += nnode.s
+    s += n.s
 
-    # h_bool = check_collision2(tg + t0, s, obs_list)
     a_cost = (acc**2).reshape(-1,)
     v_cost = np.sum((v11 - v_ref)**2, axis=1)
-    # scost
     h_cost = a_cost + v_cost
 
     return np.min(h_cost)
 
 
-def calc_heuristic22(nnode):
-    '''
-    :param nnode: node type
-    :return: True if there is no possible heuristic path
-    '''
-    v = nnode.v
-    t0 = nnode.t
-    tt = min(T-t0, 2)
-    # tg = np.arange(0, T-t0+dT, dT)
-
-    tg = np.arange(0, tt+dT, dT)
-
-    # for _motion in motions:
-    # ssst = time.time()
-    # v_u, v_l = v0 + a_max * t, v0 + a_min * t
-    # s_min = np.zeros(t.size)
-    # s_max = np.zeros(t.size)
-    # s_min[1:] = np.cumsum(np.clip(v_l + 0.5 * a_min * time_step, 0, None))[:-1] * time_step
-
-    t_m = motions #+ backup_motions
-    s = np.zeros((len(t_m), tg.size))
-    acc = np.array(t_m)[:, 1].reshape(-1, 1)
-    v1 = v + acc * tg
-    delta_s = np.clip(v1 + 0.5 * acc * dT, 0, None)[:, :-1]*dT
-    s[:, 1:] = np.cumsum(delta_s, axis=1)
-    s += nnode.s
-    # print('ch')
-    # print(time.time() - ssst)
-    # ssst = time.time()
-    # print(s)
-    h_bool = check_collision2(tg+t0, s, obs_list)
-    # print(time.time() - ssst)
-    if False in h_bool:
-
-        idx, = np.where(h_bool == False)
-        if show_animation:
-            for i in idx.tolist():
-                ll = plt.plot(tg + t0, s[i, :], 'y--')
-            plt.pause(0.01)
-
-        return False, None
-
-    else:
-
-        s = np.zeros((len(backup_motions), tg.size))
-        acc = np.array(backup_motions)[:, 1].reshape(-1, 1)
-        v1 = v + acc * tg
-        delta_s = np.clip(v1 + 0.5 * acc * dT, 0, None) * dT
-        s[:, 1:] = np.cumsum(delta_s, axis=1)[:, :-1]
-        s += nnode.s
-
-        h_bool1 = check_collision2(tg + t0, s, obs_list)
-
-        if False in h_bool1:
-
-            idx, = np.where(h_bool1 == False)
-            if show_animation:
-
-                for i in idx.tolist():
-                    ll = plt.plot(tg + t0, s[i, :], 'y--')
-                plt.pause(0.01)
-
-            return False, np.array(backup_motions)[idx, :].tolist()
-
-        else:
-            return True, None
-
-
-def check_collision2(x1, x2, obstacle):
-    '''
-    :param x1:
-    :param x2:
-    :param obstacle:
-    :return: True: violates safety
-    '''
-
+def check_collision(x1, x2, obstacle):
+    """
+    Check a trajectory for safety
+    """
     if isinstance(x2, list):
         x2 = np.array(x2).reshape(len(x2), -1)
 
     if len(obstacle) == 0:
         return np.zeros(x2.shape[0]).astype(bool)
 
-    # to = np.arange(x1[0], x1[-1] + time_step, time_step)
-    to = np.linspace(x1[0], x1[-1], int((x1[-1]-x1[0])/0.1)+1)
-    so2 = np.array([np.interp(to, x1, x2[i]) for i in range(x2.shape[0])])
-    # for obstacle in obs_map:
-    tid = np.isin(to.astype(np.float32), obstacle[0].astype(np.float32), assume_unique=True)
-    oids, = np.where(np.isin(obstacle[0].astype(np.float32), to.astype(np.float32), assume_unique=True))
-    # print(time.time() - ssst)
+    obstacle_t = np.linspace(x1[0], x1[-1], int((x1[-1]-x1[0])/0.1)+1)
+    obstacle_s = np.array([np.interp(obstacle_t, x1, x2[i]) for i in range(x2.shape[0])])
+
+    tid = np.isin(obstacle_t.astype(np.float32), obstacle[0].astype(np.float32), assume_unique=True)
+    oids, = np.where(np.isin(obstacle[0].astype(np.float32), obstacle_t.astype(np.float32), assume_unique=True))
+
     if oids.size == 0:
         return np.zeros(x2.shape[0]).astype(bool)
 
-    sid = so2[:, tid]
+    sid = obstacle_s[:, tid]
     obs_temp = obstacle[1]
 
     safe_arr = np.zeros(x2.shape[0]).astype(bool)
     safe_id = np.arange(0, x2.shape[0], 1)
 
-    t_id = (to / time_step).astype(int)
-    # safety1 = safety[t_id]
-    # safety1 = safety1[tid]
+    t_id = (obstacle_t / time_step).astype(int)
+
 
     for i, oid in enumerate(oids):
-        # ssst = time.time()
-        # print('method1', time.time() - ssst)
-
-        # ssst = time.time()
-        # mind = np.min([np.square((o - sid[:, i])) for o in obs_temp[oid]], axis=0)
 
         o_d = obs_temp[oid][:, None] - sid[:, i]
 
@@ -296,90 +171,30 @@ def check_collision2(x1, x2, obstacle):
         o_dl[~(o_dl < 0)] = -99999
         min_d_l = o_dl[o_dl.argmax(axis=0), np.arange(o_dl.shape[1])]
 
-        # safe_i = (min_d_u >= safety1[i]) & (min_d_l <= -(safety1[i] + 5))
         safe_i = (min_d_u >= safety) & (min_d_l <= -(safety))
 
         safe_id = safe_id[safe_i]
         
-        # old
-        # min_id = np.abs(o_d).argmin(axis=0)
-        # mind = o_d[min_id, np.arange(o_d.shape[1])]
-        # # print('method2', time.time() - ssst)
-        #
-        # safe_i = (mind >= safety1[i]) | (mind <= -(safety1[i] + 5))
-        # safe_id = safe_id[safe_i]
         if safe_id.size == 0:
             break
         sid = sid[safe_i, :]
     safe_arr[safe_id] = np.ones(safe_id.size).astype(bool)
 
-    return ~safe_arr  # safe_bool.any(1)
+    return ~safe_arr 
 
-
-def extend_node(m, c_node, c_node_id):
-    n_x = c_node.t + m[0] * dT
+def extend_node(m, c_n, c_n_id):
+    n_x = c_n.t + m[0] * dT
     a = m[1]
-    n_v = np.clip(c_node.v + a * dT, 0, None)
+    n_v = np.clip(c_n.v + a * dT, 0, None)
 
-    # if n_v < 0:
-    #     return None, None
-
-    # n_s = c_node.s + c_node.v * dT + 0.5 * a * dT ** 2
-    n_s = c_node.s + np.clip(c_node.v * dT + 0.5 * a * dT ** 2, 0, None)
+    n_s = c_n.s + np.clip(c_n.v * dT + 0.5 * a * dT ** 2, 0, None)
     n_cost = cost_fun(n_s, n_v, a)
 
     n_node = Node(n_x, n_s, n_v,
-                  c_node.cost + n_cost,
-                  c_node_id)
+                  c_n.cost + n_cost,
+                  c_n_id)
 
     return grid_id(n_node), n_node
-
-
-def get_constraints(ssoln, tsoln):
-
-    if len(obs_list) == 0:
-        return [], []
-
-    to = np.arange(tsoln[0], tsoln[-1] + time_step, time_step)
-    so = np.interp(to, tsoln, ssoln)
-
-    # for obstacle in obs_map:
-    tid = np.isin(to.astype(np.float32), obs_list[0].astype(np.float32), assume_unique=True)
-    oids, = np.where(np.isin(obs_list[0].astype(np.float32), to.astype(np.float32), assume_unique=True))
-    # print(time.time() - ssst)
-    if oids.size == 0:
-        return [], []
-
-    sid = so[tid]
-
-    obs_temp = obs_list[1]
-
-    u_bound, l_bound = [], []
-
-    for i, oid in enumerate(oids):
-        d = np.array([o - sid[i] for o in obs_temp[oid]])
-        u = d[d > 0] + sid[i]
-        l = d[d < 0] + sid[i]
-        if len(u) != 0:
-            u_bound.append([np.min(u), obs_list[0][oid]])
-        if len(l) != 0:
-            l_bound.append([np.max(l), obs_list[0][oid]])
-
-    return u_bound, l_bound
-
-
-class Node:
-    def __init__(self, xid, yid, v, cost, parent_id):
-        # TODO: convert t from index to actual t
-        self.t = xid  # index
-        self.s = yid
-        self.v = v
-        self.cost = cost
-        self.parent_id = parent_id
-
-    def __state__(self):
-        return self.s, self.v, self.t, self.cost, self.parent_id
-
 
 start_node = Node(0, s0, v0, 0.0, -1)
 goal_node = None
@@ -387,46 +202,19 @@ goal_node = None
 open_set, closed_set = dict(), dict()
 open_set[grid_id(start_node)] = start_node
 
-st = time.time()
 counter = 0
 closeidlist = []
+
+t_m = motions + backup_motions
 
 while len(open_set) != 0:
     counter += 1
 
-    # sst = time.time()
+    c_id = min(open_set, key=lambda o: (-open_set[o].t, open_set[o].cost + calc_heuristic(open_set[o])))
 
-    # c_id_list = sorted(open_set, key=lambda o: open_set[o].cost + calc_heuristic3(open_set[o]))
-    c_id = min(open_set, key=lambda o: (-open_set[o].t, open_set[o].cost + calc_heuristic3(open_set[o])))
-
-    # current_nodes = []
-    # for c_id in c_id_list:
-    #     sst = time.time()
-    #     check_h, b_motions = calc_heuristic3(open_set[c_id])
-    #     if check_h:
-    #         continue
-    #     else:
-    #
-    #         closeidlist.append(c_id)
-    #         current_nodes.append([open_set[c_id], c_id, b_motions])
-    #
-    #         if show_animation:
-    #             pid = open_set[c_id].parent_id
-    #             if pid != -1:
-    #                 plt.plot([open_set[c_id].t, closed_set[pid].t],
-    #                          [open_set[c_id].s, closed_set[pid].s], 'b--')
-    #
-    #         target_nodes = current_nodes
-    #     if len(current_nodes) == 2:
-    #         break
-
-    # print(time.time() - sst)
-    # sst = time.time()
     current = open_set[c_id]
     current_id = c_id
 
-    coll_counter2 = 0
-    # print(current.cost)
     if np.isclose(current.t, T):
         goal_node = current
         break
@@ -438,11 +226,12 @@ while len(open_set) != 0:
     n_temp_list = []
     d_temp_list = []
 
-    for motion in t_motions:
+
+    for motion in t_m:
 
         n_id, node = extend_node(motion, current, current_id)
 
-        check = check_collision2([current.t, current.t + dT], np.array([[current.s, node.s]]), obs_list)
+        check = check_collision([current.t, current.t + dT], np.array([[current.s, node.s]]), obstacle_info)
 
         if check:
             continue
@@ -472,11 +261,9 @@ while len(open_set) != 0:
                     sa_count += 1
                     plt.pause(0.1)
 
-    # print(time.time() - sst)
-    # print('end loop')
     if goal_node is not None:
         break
-# TODO: else no solution when None
+
 rx, ry = [goal_node.t], [goal_node.s]
 p_id = goal_node.parent_id
 
@@ -486,20 +273,8 @@ while p_id != -1:
     ry.append(nd.s)
     p_id = nd.parent_id
 
-print(time.time()-st)
-
-uu, ll = get_constraints(ry[::-1], rx[::-1])
-
 if show_animation:
     plt.plot(rx, ry, 'b', label='solution')
-    # for u in uu:
-    #     plt.plot(u[1], u[0], 'y*')
-    # for l in ll:
-    #     plt.plot(l[1], l[0], 'y*')
-    #
-    # plt.legend()
-    # plt.xlabel('time [s]')
-    # plt.ylabel('distance travelled [m]')
     plt.pause(0.001)
     plt.show()
 
